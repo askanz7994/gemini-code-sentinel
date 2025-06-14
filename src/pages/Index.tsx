@@ -1,9 +1,11 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, KeyRound } from "lucide-react";
+import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, KeyRound, Files } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type Vulnerability = {
   id: number;
@@ -24,10 +26,12 @@ const Index = () => {
   const [repoUrl, setRepoUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [activeAction, setActiveAction] = useState<'fetch' | 'scan' | null>(null);
   const [results, setResults] = useState<Vulnerability[] | null>(null);
+  const [repoFiles, setRepoFiles] = useState<any[] | null>(null);
   const { toast } = useToast();
 
-  const handleScan = async (e: React.FormEvent) => {
+  const handleFetchFiles = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!repoUrl) {
       toast({ title: "Error", description: "Please enter a GitHub repository URL.", variant: "destructive" });
@@ -38,18 +42,21 @@ const Index = () => {
       return;
     }
     setIsLoading(true);
+    setActiveAction('fetch');
     setResults(null);
+    setRepoFiles(null);
     
     try {
       const urlParts = repoUrl.replace(/^(https?:\/\/)?github\.com\//, '').replace(/\.git$/, '').split('/');
       if (urlParts.length < 2) {
         toast({ title: "Error", description: "Invalid GitHub repository URL.", variant: "destructive" });
         setIsLoading(false);
+        setActiveAction(null);
         return;
       }
       const [owner, repo] = urlParts;
 
-      toast({ title: "Starting Scan...", description: "Fetching repository file list." });
+      toast({ title: "Fetching Files...", description: "Getting repository file list." });
       
       const repoInfoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
        if (!repoInfoResponse.ok) {
@@ -92,20 +99,49 @@ const Index = () => {
         !ignoredPaths.some(ignoredPath => file.path.startsWith(ignoredPath)) &&
         (scannableExtensions.some(ext => file.path.endsWith(ext)) || scannableFiles.includes(file.path.split('/').pop()))
       );
+      
+      setRepoFiles(filesToScan);
 
-      if (filesToScan.length === 0) {
-        toast({ title: "Scan Complete", description: "No scannable files found in the repository.", variant: "default" });
-        setResults([]);
-        setIsLoading(false);
-        return;
+      if (filesToScan.length > 0) {
+        toast({ title: "Files Loaded", description: `Found ${filesToScan.length} scannable files. Ready to scan.` });
+      } else {
+        toast({ title: "No Files Found", description: "No scannable files were found in this repository." });
       }
 
-      setResults([]);
+    } catch (error) {
+      console.error("Fetch failed:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
+      setRepoFiles(null);
+    } finally {
+      setIsLoading(false);
+      setActiveAction(null);
+    }
+  };
+
+  const handleStartScan = async () => {
+    if (!repoFiles || repoFiles.length === 0) {
+      toast({ title: "Error", description: "No files to scan.", variant: "destructive" });
+      return;
+    }
+    if (!repoUrl || !apiKey) {
+      toast({ title: "Error", description: "Missing repository info or API key.", variant: "destructive" });
+      return;
+    }
+
+    setIsLoading(true);
+    setActiveAction('scan');
+    setResults([]);
+    
+    try {
+      const urlParts = repoUrl.replace(/^(https?:\/\/)?github\.com\//, '').replace(/\.git$/, '').split('/');
+      const [owner, repo] = urlParts;
+
       let vulnerabilityIdCounter = 1;
       let allVulnerabilities: Vulnerability[] = [];
 
-      for (const [index, file] of filesToScan.entries()) {
-        toast({ title: "Scanning...", description: `Analyzing ${file.path} (${index + 1}/${filesToScan.length})` });
+      for (const [index, file] of repoFiles.entries()) {
+        toast({ title: "Scanning...", description: `Analyzing ${file.path} (${index + 1}/${repoFiles.length})` });
 
         try {
             const fileUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}`;
@@ -198,17 +234,17 @@ const Index = () => {
       }
 
       if (allVulnerabilities.length > 0) {
-        toast({ title: "Scan Complete", description: `Found ${allVulnerabilities.length} potential vulnerabilities across ${filesToScan.length} files.` });
+        toast({ title: "Scan Complete", description: `Found ${allVulnerabilities.length} potential vulnerabilities across ${repoFiles.length} files.` });
       } else {
-        toast({ title: "Scan Complete", description: `Scanned ${filesToScan.length} files. No vulnerabilities found.` });
+        toast({ title: "Scan Complete", description: `Scanned ${repoFiles.length} files. No vulnerabilities found.` });
       }
-
     } catch (error) {
-      console.error("Scan failed:", error);
+       console.error("Scan failed:", error);
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
       toast({ title: "Error", description: errorMessage, variant: "destructive" });
     } finally {
       setIsLoading(false);
+      setActiveAction(null);
     }
   };
 
@@ -229,7 +265,7 @@ const Index = () => {
         </header>
 
         <main className="w-full max-w-2xl mx-auto">
-          <form onSubmit={handleScan} className="space-y-4">
+          <form onSubmit={handleFetchFiles} className="space-y-4">
             <div className="relative">
               <Github className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input 
@@ -238,6 +274,7 @@ const Index = () => {
                 className="pl-10 h-12 bg-card border-border/50 focus:ring-accent focus:ring-offset-background"
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
+                disabled={isLoading}
               />
             </div>
              <div className="relative">
@@ -248,6 +285,7 @@ const Index = () => {
                 className="pl-10 h-12 bg-card border-border/50 focus:ring-accent focus:ring-offset-background"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
+                disabled={isLoading}
               />
             </div>
             <Button 
@@ -255,16 +293,70 @@ const Index = () => {
               className="w-full h-12 text-lg font-bold bg-accent text-primary-foreground border-2 border-transparent transition-all duration-300 hover:bg-transparent hover:text-accent hover:border-accent"
               disabled={isLoading}
             >
-              {isLoading ? (
+              {isLoading && activeAction === 'fetch' ? (
                 <LoaderCircle className="animate-spin h-6 w-6" />
               ) : (
-                "Scan Repository"
+                "Analyze Repository"
               )}
             </Button>
              <p className="text-xs text-center text-muted-foreground pt-2">
                 Your API key is used only for this session and is not stored. For production, use server-side handling.
              </p>
           </form>
+
+          {repoFiles && !isLoading && (
+            <div className="mt-8 w-full">
+              <Card className="bg-card/80 backdrop-blur-sm border-border/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <Files className="h-6 w-6 text-accent" />
+                    <span>Scannable Files</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {repoFiles.length > 0 ? (
+                    <>
+                      <p className="text-muted-foreground mb-4">
+                        Found {repoFiles.length} files to scan. Click the button below to start the vulnerability check.
+                      </p>
+                      <div className="max-h-60 overflow-y-auto rounded-md border bg-background/50">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-white">File Path</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {repoFiles.map((file) => (
+                              <TableRow key={file.path}>
+                                <TableCell className="font-mono text-sm">{file.path}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                      <Button 
+                        onClick={handleStartScan}
+                        className="w-full mt-6 h-12 text-lg font-bold"
+                        disabled={isLoading}
+                      >
+                        {isLoading && activeAction === 'scan' ? (
+                          <LoaderCircle className="animate-spin h-6 w-6" />
+                        ) : (
+                          "Start Vulnerability Scan"
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-muted-foreground">No scannable files found in this repository.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Check the list of supported file types or try another repository.</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {results && (
             <div className="mt-12">
