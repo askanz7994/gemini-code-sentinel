@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,37 +12,6 @@ type Vulnerability = {
   severity: 'Critical' | 'High' | 'Medium' | 'Low';
   description: string;
 };
-
-const mockVulnerabilities: Vulnerability[] = [
-  {
-    id: 1,
-    file: 'package.json',
-    line: 25,
-    severity: 'High',
-    description: "Outdated dependency 'axios@0.21.1' with known prototype pollution vulnerability (CVE-2023-45857).",
-  },
-  {
-    id: 2,
-    file: 'src/utils/auth.js',
-    line: 112,
-    severity: 'Critical',
-    description: "Hardcoded API secret found. Secrets should be stored in environment variables or a secret manager.",
-  },
-  {
-    id: 3,
-    file: 'routes/user.js',
-    line: 45,
-    severity: 'Medium',
-    description: "Potential SQL injection vector found. Use parameterized queries instead of string concatenation.",
-  },
-    {
-    id: 4,
-    file: 'public/index.html',
-    line: 8,
-    severity: 'Low',
-    description: "Missing Content Security Policy (CSP) header. Helps prevent XSS attacks.",
-  },
-];
 
 const severityIcons = {
   'Critical': <ShieldAlert className="h-5 w-5 text-red-500" />,
@@ -72,12 +40,94 @@ const Index = () => {
     setIsLoading(true);
     setResults(null);
     
-    // Mock API call
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    setResults(mockVulnerabilities);
-    setIsLoading(false);
-    toast({ title: "Scan Complete", description: "Found 4 potential vulnerabilities." });
+    try {
+      const urlParts = repoUrl.replace(/^(https?:\/\/)?github\.com\//, '').split('/');
+      if (urlParts.length < 2) {
+        toast({ title: "Error", description: "Invalid GitHub repository URL.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+      const [owner, repo] = urlParts;
+
+      toast({ title: "Scanning...", description: "Fetching package.json from GitHub." });
+      const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/package.json`;
+      const githubResponse = await fetch(githubApiUrl);
+
+      if (!githubResponse.ok) {
+        if (githubResponse.status === 404) {
+             toast({ title: "Scan Update", description: "No package.json found. Currently, only package.json is scanned.", variant: "default" });
+        } else {
+             toast({ title: "Error", description: `Failed to fetch package.json: ${githubResponse.statusText}`, variant: "destructive" });
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      const fileData = await githubResponse.json();
+      const packageJsonContent = atob(fileData.content);
+
+      toast({ title: "Scanning...", description: "Analyzing dependencies with Gemini AI." });
+      const prompt = `
+        Analyze the following package.json content for security vulnerabilities in its dependencies.
+        For each vulnerability, provide the package name, version, severity, and a concise description of the vulnerability.
+        The severity MUST be one of: 'Critical', 'High', 'Medium', 'Low'.
+        Respond with ONLY a valid JSON array of objects. Each object in the array must have the following schema: { "id": number, "file": "package.json", "line": number, "severity": "Critical" | "High" | "Medium" | "Low", "description": string }.
+        The 'line' number should be your best guess for the line number of the dependency in the JSON file, or 0 if not applicable. The 'id' should be a unique number for each vulnerability.
+        If there are no vulnerabilities, return an empty array [].
+        Do not include any text, notes, or explanations before or after the JSON array.
+
+        Here is the package.json content:
+        ${packageJsonContent}
+      `;
+
+      const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+      const geminiResponse = await fetch(geminiApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      });
+
+      if (!geminiResponse.ok) {
+        const errorData = await geminiResponse.json();
+        console.error("Gemini API Error:", errorData);
+        toast({ title: "Gemini API Error", description: errorData?.error?.message || "An unknown error occurred.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+
+      const geminiData = await geminiResponse.json();
+      if (!geminiData.candidates || geminiData.candidates.length === 0) {
+        toast({ title: "AI Error", description: "The AI returned an empty response.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+
+      const responseText = geminiData.candidates[0].content.parts[0].text;
+      const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      let vulnerabilities: Vulnerability[] = [];
+      try {
+        vulnerabilities = JSON.parse(cleanedResponse);
+      } catch (e) {
+        console.error("Failed to parse AI response:", cleanedResponse);
+        throw new Error("The AI returned a response in an unexpected format.");
+      }
+
+      setResults(vulnerabilities);
+      if (vulnerabilities.length > 0) {
+        toast({ title: "Scan Complete", description: `Found ${vulnerabilities.length} potential vulnerabilities.` });
+      } else {
+        toast({ title: "Scan Complete", description: "No vulnerabilities found in package.json." });
+      }
+
+    } catch (error) {
+      console.error("Scan failed:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -137,22 +187,34 @@ const Index = () => {
           {results && (
             <div className="mt-12">
               <h2 className="text-2xl font-bold text-center mb-6">Scan Results</h2>
-              <div className="space-y-4">
-                {results.map((vuln) => (
-                  <Card key={vuln.id} className="bg-card/80 backdrop-blur-sm border-border/30">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-3">
-                        {severityIcons[vuln.severity]}
-                        <span className="text-lg">{vuln.severity} Severity</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="font-mono text-sm text-accent mb-2">{vuln.file}:{vuln.line}</p>
-                      <p className="text-muted-foreground">{vuln.description}</p>
+              {results.length > 0 ? (
+                <div className="space-y-4">
+                  {results.map((vuln) => (
+                    <Card key={vuln.id} className="bg-card/80 backdrop-blur-sm border-border/30">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-3">
+                          {severityIcons[vuln.severity]}
+                          <span className="text-lg">{vuln.severity} Severity</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="font-mono text-sm text-accent mb-2">{vuln.file}:{vuln.line}</p>
+                        <p className="text-muted-foreground">{vuln.description}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                 <Card className="bg-card/80 backdrop-blur-sm border-border/30">
+                    <CardContent className="pt-6">
+                      <div className="flex flex-col items-center justify-center text-center p-6">
+                        <ShieldCheck className="h-12 w-12 text-green-500 mb-4" />
+                        <p className="text-lg font-semibold">No Vulnerabilities Found</p>
+                        <p className="text-muted-foreground mt-1">The scan of package.json completed successfully.</p>
+                      </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
+              )}
             </div>
           )}
         </main>
