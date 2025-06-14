@@ -1,9 +1,8 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, KeyRound, Files } from "lucide-react";
+import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, KeyRound, Files, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -25,6 +24,7 @@ const severityIcons = {
 const Index = () => {
   const [repoUrl, setRepoUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [githubToken, setGithubToken] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<'fetch' | 'scan' | null>(null);
   const [results, setResults] = useState<Vulnerability[] | null>(null);
@@ -56,12 +56,20 @@ const Index = () => {
       }
       const [owner, repo] = urlParts;
 
+      const headers: HeadersInit = {};
+      if (githubToken) {
+        headers['Authorization'] = `Bearer ${githubToken}`;
+      }
+
       toast({ title: "Fetching Files...", description: "Getting repository file list." });
       
-      const repoInfoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+      const repoInfoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
        if (!repoInfoResponse.ok) {
         if (repoInfoResponse.status === 404) {
-          throw new Error("Repository not found. Make sure the URL is correct and the repository is public.");
+          throw new Error("Repository not found. Make sure the URL is correct and the repository is public, or that your token has access.");
+        }
+        if (repoInfoResponse.status === 401) {
+          throw new Error("Authentication failed. Make sure your GitHub Personal Access Token is correct and has 'repo' scope.");
         }
         if (repoInfoResponse.status === 403) {
           const errorData = await repoInfoResponse.json().catch(() => ({ message: "Rate limit likely exceeded or repository is private."}));
@@ -73,10 +81,13 @@ const Index = () => {
       const repoInfo = await repoInfoResponse.json();
       const defaultBranch = repoInfo.default_branch;
 
-      const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`);
+      const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`, { headers });
        if (!treeResponse.ok) {
         if (treeResponse.status === 404) {
           throw new Error("Could not find the repository's file tree. The default branch may not exist or is empty.");
+        }
+        if (treeResponse.status === 401) {
+          throw new Error("Authentication failed. Make sure your GitHub Personal Access Token is correct and has 'repo' scope.");
         }
         if (treeResponse.status === 403) {
           const errorData = await treeResponse.json().catch(() => ({ message: "Rate limit likely exceeded or repository is private."}));
@@ -137,21 +148,29 @@ const Index = () => {
       const urlParts = repoUrl.replace(/^(https?:\/\/)?github\.com\//, '').replace(/\.git$/, '').split('/');
       const [owner, repo] = urlParts;
 
+      const headers: HeadersInit = {};
+      if (githubToken) {
+        headers['Authorization'] = `Bearer ${githubToken}`;
+      }
+
       let vulnerabilityIdCounter = 1;
       let allVulnerabilities: Vulnerability[] = [];
 
       for (const [index, file] of repoFiles.entries()) {
         toast({ title: "Scanning...", description: `Analyzing ${file.path} (${index + 1}/${repoFiles.length})` });
+        
+        const fileUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}`;
+        const githubFileResponse = await fetch(fileUrl, { headers });
+
+        if (!githubFileResponse.ok) {
+          if (githubFileResponse.status === 401) {
+            throw new Error("Authentication failed while fetching a file. Make sure your GitHub token is correct and has 'repo' scope. Scan aborted.");
+          }
+          console.warn(`Could not fetch file: ${file.path}. Status: ${githubFileResponse.statusText}`);
+          continue; // Skip this file and proceed to the next one
+        }
 
         try {
-            const fileUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}`;
-            const githubFileResponse = await fetch(fileUrl);
-    
-            if (!githubFileResponse.ok) {
-              console.warn(`Could not fetch file: ${file.path}. Status: ${githubFileResponse.statusText}`);
-              continue; // Skip this file
-            }
-    
             const fileData = await githubFileResponse.json();
             
             if (fileData.size > 100000) { 
@@ -277,7 +296,18 @@ const Index = () => {
                 disabled={isLoading}
               />
             </div>
-             <div className="relative">
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                type="password"
+                placeholder="Enter your GitHub Personal Access Token"
+                className="pl-10 h-12 bg-card border-border/50 focus:ring-accent focus:ring-offset-background"
+                value={githubToken}
+                onChange={(e) => setGithubToken(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="relative">
               <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input 
                 type="password"
@@ -300,7 +330,12 @@ const Index = () => {
               )}
             </Button>
              <p className="text-xs text-center text-muted-foreground pt-2">
-                Your API key is used only for this session and is not stored. For production, use server-side handling.
+                Your API keys are used only for this session and are not stored.
+                To scan private repos, {' '}
+                <a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank" rel="noopener noreferrer" className="underline hover:text-accent">
+                    create a GitHub token
+                </a>
+                {' '} with <code className="bg-muted px-1 py-0.5 rounded">repo</code> scope.
              </p>
           </form>
 
