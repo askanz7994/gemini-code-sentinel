@@ -53,14 +53,30 @@ const Index = () => {
       
       const repoInfoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
        if (!repoInfoResponse.ok) {
-        throw new Error(`Failed to fetch repository info: ${repoInfoResponse.statusText}`);
+        if (repoInfoResponse.status === 404) {
+          throw new Error("Repository not found. Make sure the URL is correct and the repository is public.");
+        }
+        if (repoInfoResponse.status === 403) {
+          const errorData = await repoInfoResponse.json().catch(() => ({ message: "Rate limit likely exceeded or repository is private."}));
+          console.error("GitHub API Error:", errorData);
+          throw new Error(`GitHub API access forbidden. ${errorData.message}`);
+        }
+        throw new Error(`Failed to fetch repository info: ${repoInfoResponse.statusText} (Status: ${repoInfoResponse.status})`);
       }
       const repoInfo = await repoInfoResponse.json();
       const defaultBranch = repoInfo.default_branch;
 
       const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`);
        if (!treeResponse.ok) {
-        throw new Error(`Failed to fetch repository file tree: ${treeResponse.statusText}`);
+        if (treeResponse.status === 404) {
+          throw new Error("Could not find the repository's file tree. The default branch may not exist or is empty.");
+        }
+        if (treeResponse.status === 403) {
+          const errorData = await treeResponse.json().catch(() => ({ message: "Rate limit likely exceeded or repository is private."}));
+          console.error("GitHub API Error:", errorData);
+          throw new Error(`GitHub API access forbidden while fetching file tree. ${errorData.message}`);
+        }
+        throw new Error(`Failed to fetch repository file tree: ${treeResponse.statusText} (Status: ${treeResponse.status})`);
       }
       const treeData = await treeResponse.json();
       if(treeData.truncated) {
