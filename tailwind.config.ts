@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -18,6 +19,9 @@ export default {
 			}
 		},
 		extend: {
+      fontFamily: {
+        sans: ['Space Grotesk', 'sans-serif'],
+      },
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -84,11 +88,19 @@ export default {
 					to: {
 						height: '0'
 					}
-				}
+				},
+        'blob-spin': {
+          '0%': { transform: 'translate(0px, 0px) scale(1)' },
+          '25%': { transform: 'translate(40px, -60px) scale(1.1)' },
+          '50%': { transform: 'translate(0px, 80px) scale(0.9)' },
+          '75%': { transform: 'translate(-80px, -20px) scale(1.05)' },
+          '100%': { transform: 'translate(0px, 0px) scale(1)' },
+        }
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+        'blob': 'blob-spin 20s cubic-bezier(0.76, 0, 0.24, 1) infinite'
 			}
 		}
 	},
