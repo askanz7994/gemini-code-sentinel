@@ -41,7 +41,7 @@ const Index = () => {
     setResults(null);
     
     try {
-      const urlParts = repoUrl.replace(/^(https?:\/\/)?github\.com\//, '').split('/');
+      const urlParts = repoUrl.replace(/^(https?:\/\/)?github\.com\//, '').replace(/\.git$/, '').split('/');
       if (urlParts.length < 2) {
         toast({ title: "Error", description: "Invalid GitHub repository URL.", variant: "destructive" });
         setIsLoading(false);
@@ -49,76 +49,142 @@ const Index = () => {
       }
       const [owner, repo] = urlParts;
 
-      toast({ title: "Scanning...", description: "Fetching package.json from GitHub." });
-      const githubApiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/package.json`;
-      const githubResponse = await fetch(githubApiUrl);
+      toast({ title: "Starting Scan...", description: "Fetching repository file list." });
+      
+      const repoInfoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+       if (!repoInfoResponse.ok) {
+        throw new Error(`Failed to fetch repository info: ${repoInfoResponse.statusText}`);
+      }
+      const repoInfo = await repoInfoResponse.json();
+      const defaultBranch = repoInfo.default_branch;
 
-      if (!githubResponse.ok) {
-        if (githubResponse.status === 404) {
-             toast({ title: "Scan Update", description: "No package.json found. Currently, only package.json is scanned.", variant: "default" });
-        } else {
-             toast({ title: "Error", description: `Failed to fetch package.json: ${githubResponse.statusText}`, variant: "destructive" });
+      const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${defaultBranch}?recursive=1`);
+       if (!treeResponse.ok) {
+        throw new Error(`Failed to fetch repository file tree: ${treeResponse.statusText}`);
+      }
+      const treeData = await treeResponse.json();
+      if(treeData.truncated) {
+        toast({ title: "Warning", description: "Repository is too large, some files may not be scanned.", variant: "default" });
+      }
+
+      const scannableExtensions = ['.js', '.jsx', '.ts', '.tsx', 'package.json', 'Dockerfile', '.yml', '.yaml', '.py', '.go', '.java', '.rb', '.hcl'];
+      const scannableFiles = ['requirements.txt', 'pom.xml', 'build.gradle'];
+      const ignoredPaths = ['node_modules/', 'dist/', 'build/', '.git/', 'vendor/'];
+
+      const filesToScan = treeData.tree.filter((file: any) => 
+        file.type === 'blob' &&
+        !ignoredPaths.some(ignoredPath => file.path.startsWith(ignoredPath)) &&
+        (scannableExtensions.some(ext => file.path.endsWith(ext)) || scannableFiles.includes(file.path.split('/').pop()))
+      );
+
+      if (filesToScan.length === 0) {
+        toast({ title: "Scan Complete", description: "No scannable files found in the repository.", variant: "default" });
+        setResults([]);
+        setIsLoading(false);
+        return;
+      }
+
+      setResults([]);
+      let vulnerabilityIdCounter = 1;
+      let allVulnerabilities: Vulnerability[] = [];
+
+      for (const [index, file] of filesToScan.entries()) {
+        toast({ title: "Scanning...", description: `Analyzing ${file.path} (${index + 1}/${filesToScan.length})` });
+
+        try {
+            const fileUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}`;
+            const githubFileResponse = await fetch(fileUrl);
+    
+            if (!githubFileResponse.ok) {
+              console.warn(`Could not fetch file: ${file.path}. Status: ${githubFileResponse.statusText}`);
+              continue; // Skip this file
+            }
+    
+            const fileData = await githubFileResponse.json();
+            
+            if (fileData.size > 100000) { 
+              console.warn(`Skipping large file: ${file.path}`);
+              continue;
+            }
+
+            if (!fileData.content) {
+              console.warn(`Skipping empty file: ${file.path}`);
+              continue;
+            }
+
+            const fileContent = atob(fileData.content);
+    
+            const prompt = `
+              Analyze the following code from the file '${file.path}' for security vulnerabilities.
+              For each vulnerability, provide a concise description.
+              The severity MUST be one of: 'Critical', 'High', 'Medium', 'Low'.
+              Respond with ONLY a valid JSON array of objects. Each object in the array must have the following schema: { "id": number, "file": string, "line": number, "severity": "Critical" | "High" | "Medium" | "Low", "description": string }.
+              The 'file' attribute MUST be exactly '${file.path}'.
+              The 'line' number should be the best guess for the line where the vulnerability is found. The 'id' can be a placeholder, it will be reassigned.
+              If there are NO vulnerabilities in this file, you MUST return an empty array [].
+              Do not include any text, notes, or explanations before or after the JSON array.
+    
+              Here is the code from '${file.path}':
+              \`\`\`
+              ${fileContent}
+              \`\`\`
+            `;
+
+            const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+            const geminiResponse = await fetch(geminiApiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+              }),
+            });
+    
+            if (!geminiResponse.ok) {
+              const errorData = await geminiResponse.json();
+              console.error(`Gemini API Error for ${file.path}:`, errorData);
+              toast({ title: "Gemini API Error", description: `Analysis failed for ${file.path}.`, variant: "destructive" });
+              continue;
+            }
+    
+            const geminiData = await geminiResponse.json();
+             if (!geminiData.candidates || geminiData.candidates.length === 0 || !geminiData.candidates[0].content?.parts) {
+              console.warn(`The AI returned an empty or invalid response for ${file.path}.`, geminiData);
+              continue;
+            }
+
+            const responseText = geminiData.candidates[0].content.parts[0].text;
+            const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+            let vulnerabilitiesInFile: Vulnerability[] = [];
+            try {
+              if (cleanedResponse) {
+                vulnerabilitiesInFile = JSON.parse(cleanedResponse);
+              }
+            } catch (e) {
+              console.error(`Failed to parse AI response for ${file.path}:`, cleanedResponse);
+              toast({ title: "AI Response Error", description: `Could not parse analysis for ${file.path}.`, variant: "destructive" });
+              continue;
+            }
+
+            if (vulnerabilitiesInFile.length > 0) {
+                const newVulnerabilities = vulnerabilitiesInFile.map(v => ({
+                    ...v,
+                    id: vulnerabilityIdCounter++,
+                    file: file.path
+                }));
+                allVulnerabilities = [...allVulnerabilities, ...newVulnerabilities];
+                setResults([...allVulnerabilities]);
+            }
+        } catch (fileError) {
+            console.error(`Error processing file ${file.path}:`, fileError);
+            toast({ title: "File Processing Error", description: `An error occurred while scanning ${file.path}.`, variant: "destructive" });
         }
-        setIsLoading(false);
-        return;
       }
 
-      const fileData = await githubResponse.json();
-      const packageJsonContent = atob(fileData.content);
-
-      toast({ title: "Scanning...", description: "Analyzing dependencies with Gemini AI." });
-      const prompt = `
-        Analyze the following package.json content for security vulnerabilities in its dependencies.
-        For each vulnerability, provide the package name, version, severity, and a concise description of the vulnerability.
-        The severity MUST be one of: 'Critical', 'High', 'Medium', 'Low'.
-        Respond with ONLY a valid JSON array of objects. Each object in the array must have the following schema: { "id": number, "file": "package.json", "line": number, "severity": "Critical" | "High" | "Medium" | "Low", "description": string }.
-        The 'line' number should be your best guess for the line number of the dependency in the JSON file, or 0 if not applicable. The 'id' should be a unique number for each vulnerability.
-        If there are no vulnerabilities, return an empty array [].
-        Do not include any text, notes, or explanations before or after the JSON array.
-
-        Here is the package.json content:
-        ${packageJsonContent}
-      `;
-
-      const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
-      const geminiResponse = await fetch(geminiApiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-      });
-
-      if (!geminiResponse.ok) {
-        const errorData = await geminiResponse.json();
-        console.error("Gemini API Error:", errorData);
-        toast({ title: "Gemini API Error", description: errorData?.error?.message || "An unknown error occurred.", variant: "destructive" });
-        setIsLoading(false);
-        return;
-      }
-
-      const geminiData = await geminiResponse.json();
-      if (!geminiData.candidates || geminiData.candidates.length === 0) {
-        toast({ title: "AI Error", description: "The AI returned an empty response.", variant: "destructive" });
-        setIsLoading(false);
-        return;
-      }
-
-      const responseText = geminiData.candidates[0].content.parts[0].text;
-      const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-      let vulnerabilities: Vulnerability[] = [];
-      try {
-        vulnerabilities = JSON.parse(cleanedResponse);
-      } catch (e) {
-        console.error("Failed to parse AI response:", cleanedResponse);
-        throw new Error("The AI returned a response in an unexpected format.");
-      }
-
-      setResults(vulnerabilities);
-      if (vulnerabilities.length > 0) {
-        toast({ title: "Scan Complete", description: `Found ${vulnerabilities.length} potential vulnerabilities.` });
+      if (allVulnerabilities.length > 0) {
+        toast({ title: "Scan Complete", description: `Found ${allVulnerabilities.length} potential vulnerabilities across ${filesToScan.length} files.` });
       } else {
-        toast({ title: "Scan Complete", description: "No vulnerabilities found in package.json." });
+        toast({ title: "Scan Complete", description: `Scanned ${filesToScan.length} files. No vulnerabilities found.` });
       }
 
     } catch (error) {
