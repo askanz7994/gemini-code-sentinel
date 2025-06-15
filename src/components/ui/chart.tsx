@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 
@@ -65,6 +66,15 @@ const ChartContainer = React.forwardRef<
 })
 ChartContainer.displayName = "Chart"
 
+const sanitizeCssValue = (value: string) => {
+  if (typeof value !== "string") {
+    return ""
+  }
+  // A simple sanitizer for CSS values. It allows characters commonly found
+  // in colors, gradients, and variables.
+  return value.replace(/[^a-zA-Z0-9\s_#\-%.,()]/g, "")
+}
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
     ([_, config]) => config.theme || config.color
@@ -86,7 +96,7 @@ ${colorConfig
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+    return color ? `  --color-${key}: ${sanitizeCssValue(color)};` : null
   })
   .join("\n")}
 }
