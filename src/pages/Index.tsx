@@ -61,7 +61,10 @@ const Index = () => {
         return;
       }
 
-      const [, owner, repo] = match;
+      let [, owner, repo] = match;
+      if (repo.endsWith('.git')) {
+        repo = repo.slice(0, -4);
+      }
       setRepoInfo({ owner, repo });
 
       const headers: HeadersInit = {};
@@ -288,7 +291,7 @@ const Index = () => {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background font-sans text-foreground">
       <div className="absolute top-0 left-0 w-72 h-72 bg-accent/20 rounded-full filter blur-3xl animate-blob" />
-      <div className="absolute top-0 right-0 w-72 h-72 bg-purple-500/20 rounded-full filter blur-3xl animate-blob animation-delay-2000" />
+      <div className="absolute top-0 right-0 w-72 h-72 bg-purple-500/20 rounded-full filter blur-3xl animate-blob" />
       <div className="absolute bottom-0 left-1/2 w-72 h-72 bg-blue-500/20 rounded-full filter blur-3xl animate-blob animation-delay-4000" />
       
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 md:p-8">
