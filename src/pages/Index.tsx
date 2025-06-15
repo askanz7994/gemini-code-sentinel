@@ -74,7 +74,11 @@ const Index = () => {
       const repoInfoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
        if (!repoInfoResponse.ok) {
         if (repoInfoResponse.status === 404) {
-          throw new Error("Repository not found. Make sure the URL is correct and the repository is public, or that your token has access.");
+           if (githubToken) {
+            throw new Error("Repository not found. Check the URL. For private repos, ensure your token has 'repo' scope and access.");
+          } else {
+            throw new Error("Repository not found. Check the URL. Private repos require a Personal Access Token.");
+          }
         }
         if (repoInfoResponse.status === 401) {
           throw new Error("Authentication failed. Make sure your GitHub Personal Access Token is correct and has 'repo' scope.");
