@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, KeyRound, Files, Lock } from "lucide-react";
+import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, KeyRound, Files, Lock, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 type Vulnerability = {
   id: number;
@@ -12,6 +13,7 @@ type Vulnerability = {
   line: number;
   severity: 'Critical' | 'High' | 'Medium' | 'Low';
   description: string;
+  remediation: string;
 };
 
 const severityIcons = {
@@ -207,9 +209,10 @@ const Index = () => {
     
             const prompt = `
               Analyze the following code from the file '${file.path}' for security vulnerabilities.
-              For each vulnerability, provide a concise description.
+              For each vulnerability, provide a concise description and a suggestion on how to fix it.
               The severity MUST be one of: 'Critical', 'High', 'Medium', 'Low'.
-              Respond with ONLY a valid JSON array of objects. Each object in the array must have the following schema: { "id": number, "file": string, "line": number, "severity": "Critical" | "High" | "Medium" | "Low", "description": string }.
+              Respond with ONLY a valid JSON array of objects. Each object in the array must have the following schema: { "id": number, "file": string, "line": number, "severity": "Critical" | "High" | "Medium" | "Low", "description": string, "remediation": string }.
+              The 'remediation' attribute should contain a clear, actionable suggestion on how to patch the vulnerability.
               The 'file' attribute MUST be exactly '${file.path}'.
               The 'line' number should be the best guess for the line where the vulnerability is found. The 'id' can be a placeholder, it will be reassigned.
               If there are NO vulnerabilities in this file, you MUST return an empty array [].
@@ -430,6 +433,23 @@ const Index = () => {
                       <CardContent>
                         <p className="font-mono text-sm text-accent mb-2">{vuln.file}:{vuln.line}</p>
                         <p className="text-muted-foreground">{vuln.description}</p>
+                        {vuln.remediation && (
+                          <Accordion type="single" collapsible className="w-full mt-4">
+                            <AccordionItem value={`remediation-${vuln.id}`}>
+                              <AccordionTrigger className="text-sm hover:no-underline">
+                                <div className="flex items-center gap-2">
+                                  <Wrench className="h-4 w-4 text-muted-foreground" />
+                                  <span>How to Patch</span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <p className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
+                                  {vuln.remediation}
+                                </p>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
