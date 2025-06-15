@@ -29,7 +29,10 @@ const Index = () => {
   const [activeAction, setActiveAction] = useState<'fetch' | 'scan' | null>(null);
   const [results, setResults] = useState<Vulnerability[] | null>(null);
   const [repoFiles, setRepoFiles] = useState<any[] | null>(null);
+  const [repoInfo, setRepoInfo] = useState<{ owner: string; repo: string } | null>(null);
   const { toast } = useToast();
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const handleFetchFiles = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,16 +48,21 @@ const Index = () => {
     setActiveAction('fetch');
     setResults(null);
     setRepoFiles(null);
+    setRepoInfo(null);
     
     try {
-      const urlParts = repoUrl.replace(/^(https?:\/\/)?github\.com\//, '').replace(/\.git$/, '').split('/');
-      if (urlParts.length < 2) {
-        toast({ title: "Error", description: "Invalid GitHub repository URL.", variant: "destructive" });
+      const githubRepoUrlPattern = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([a-zA-Z0-9-._]+)\/([a-zA-Z0-9-._]+)(?:\.git)?\/?$/;
+      const match = repoUrl.match(githubRepoUrlPattern);
+
+      if (!match) {
+        toast({ title: "Error", description: "Invalid GitHub repository URL format. Please use 'https://github.com/owner/repo'.", variant: "destructive" });
         setIsLoading(false);
         setActiveAction(null);
         return;
       }
-      const [owner, repo] = urlParts;
+
+      const [, owner, repo] = match;
+      setRepoInfo({ owner, repo });
 
       const headers: HeadersInit = {};
       if (githubToken) {
@@ -135,8 +143,12 @@ const Index = () => {
       toast({ title: "Error", description: "No files to scan.", variant: "destructive" });
       return;
     }
-    if (!repoUrl || !apiKey) {
+    if (!apiKey) {
       toast({ title: "Error", description: "Missing repository info or API key.", variant: "destructive" });
+      return;
+    }
+    if (!repoInfo) {
+      toast({ title: "Error", description: "Repository information is missing. Please fetch files first.", variant: "destructive" });
       return;
     }
 
@@ -145,8 +157,7 @@ const Index = () => {
     setResults([]);
     
     try {
-      const urlParts = repoUrl.replace(/^(https?:\/\/)?github\.com\//, '').replace(/\.git$/, '').split('/');
-      const [owner, repo] = urlParts;
+      const { owner, repo } = repoInfo;
 
       const headers: HeadersInit = {};
       if (githubToken) {
@@ -159,6 +170,8 @@ const Index = () => {
       for (const [index, file] of repoFiles.entries()) {
         toast({ title: "Scanning...", description: `Analyzing ${file.path} (${index + 1}/${repoFiles.length})` });
         
+        await sleep(200); // Add delay to mitigate hitting rate limits
+
         const fileUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}`;
         const githubFileResponse = await fetch(fileUrl, { headers });
 
@@ -211,9 +224,10 @@ const Index = () => {
             });
     
             if (!geminiResponse.ok) {
-              const errorData = await geminiResponse.json();
-              console.error(`Gemini API Error for ${file.path}:`, errorData);
-              toast({ title: "Gemini API Error", description: `Analysis failed for ${file.path}.`, variant: "destructive" });
+              const errorData = await geminiResponse.json().catch(() => null);
+              const errorMessage = errorData?.error?.message || `Analysis failed for ${file.path} with status ${geminiResponse.status}.`;
+              console.error(`Gemini API Error for ${file.path}:`, errorData || geminiResponse.statusText);
+              toast({ title: "Gemini API Error", description: errorMessage, variant: "destructive" });
               continue;
             }
     
