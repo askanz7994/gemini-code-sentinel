@@ -201,7 +201,7 @@ const Index = () => {
               \`\`\`
             `;
 
-            const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+            const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
             const geminiResponse = await fetch(geminiApiUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -419,7 +419,7 @@ const Index = () => {
                       <div className="flex flex-col items-center justify-center text-center p-6">
                         <ShieldCheck className="h-12 w-12 text-green-500 mb-4" />
                         <p className="text-lg font-semibold">No Vulnerabilities Found</p>
-                        <p className="text-muted-foreground mt-1">The scan of package.json completed successfully.</p>
+                        <p className="text-muted-foreground mt-1">The scan completed successfully and no vulnerabilities were found.</p>
                       </div>
                     </CardContent>
                   </Card>
