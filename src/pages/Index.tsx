@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, KeyRound, Files, Lock, Wrench } from "lucide-react";
+import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, KeyRound, Files, Lock, Wrench, FileCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -32,6 +32,8 @@ const Index = () => {
   const [results, setResults] = useState<Vulnerability[] | null>(null);
   const [repoFiles, setRepoFiles] = useState<any[] | null>(null);
   const [repoInfo, setRepoInfo] = useState<{ owner: string; repo: string } | null>(null);
+  const [fileContents, setFileContents] = useState<Record<string, string>>({});
+  const [loadingFileContentForVulnId, setLoadingFileContentForVulnId] = useState<number | null>(null);
   const { toast } = useToast();
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -291,6 +293,46 @@ const Index = () => {
     }
   };
 
+  const handleViewCode = async (vulnerability: Vulnerability) => {
+    if (fileContents[vulnerability.file] || loadingFileContentForVulnId === vulnerability.id) {
+      return; // Already fetched or is fetching
+    }
+    if (!repoInfo) {
+      toast({ title: "Error", description: "Repository information is missing.", variant: "destructive" });
+      return;
+    }
+
+    setLoadingFileContentForVulnId(vulnerability.id);
+    try {
+      const { owner, repo } = repoInfo;
+      const headers: HeadersInit = {};
+      if (githubToken) {
+        headers['Authorization'] = `Bearer ${githubToken}`;
+      }
+      
+      const fileUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${vulnerability.file}`;
+      const response = await fetch(fileUrl, { headers });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file content for ${vulnerability.file}. Status: ${response.status}`);
+      }
+
+      const fileData = await response.json();
+      if (!fileData.content) {
+        setFileContents(prev => ({ ...prev, [vulnerability.file]: "// File content is not available or file is empty." }));
+      } else {
+        const content = atob(fileData.content);
+        setFileContents(prev => ({ ...prev, [vulnerability.file]: content }));
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
+      setFileContents(prev => ({ ...prev, [vulnerability.file]: `// Error: ${errorMessage}` }));
+    } finally {
+      setLoadingFileContentForVulnId(null);
+    }
+  };
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-background font-sans text-foreground">
       <div className="absolute top-0 left-0 w-72 h-72 bg-accent/20 rounded-full filter blur-3xl animate-blob" />
@@ -433,8 +475,8 @@ const Index = () => {
                       <CardContent>
                         <p className="font-mono text-sm text-accent mb-2">{vuln.file}:{vuln.line}</p>
                         <p className="text-muted-foreground">{vuln.description}</p>
-                        {vuln.remediation && (
-                          <Accordion type="single" collapsible className="w-full mt-4">
+                        <Accordion type="single" collapsible className="w-full mt-4">
+                          {vuln.remediation && (
                             <AccordionItem value={`remediation-${vuln.id}`}>
                               <AccordionTrigger className="text-sm hover:no-underline">
                                 <div className="flex items-center gap-2">
@@ -448,8 +490,40 @@ const Index = () => {
                                 </p>
                               </AccordionContent>
                             </AccordionItem>
-                          </Accordion>
-                        )}
+                          )}
+                          <AccordionItem value={`code-${vuln.id}`}>
+                            <AccordionTrigger className="text-sm hover:no-underline" onClick={() => handleViewCode(vuln)}>
+                                <div className="flex items-center gap-2">
+                                    <FileCode className="h-4 w-4 text-muted-foreground" />
+                                    <span>View Code</span>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                {loadingFileContentForVulnId === vuln.id && (
+                                    <div className="flex items-center justify-center p-4">
+                                        <LoaderCircle className="h-6 w-6 animate-spin" />
+                                    </div>
+                                )}
+                                {fileContents[vuln.file] && (
+                                    <div className="bg-background/50 rounded-md overflow-hidden border">
+                                        <pre className="max-h-96 overflow-y-auto p-2 font-mono text-xs">
+                                            <code>
+                                                {fileContents[vuln.file].split('\n').map((line, index) => (
+                                                    <div 
+                                                        key={index}
+                                                        className={`flex items-start -mx-2 px-2 ${index + 1 === vuln.line ? 'bg-red-500/20' : 'hover:bg-white/5'}`}
+                                                    >
+                                                        <span className="text-right pr-4 text-muted-foreground select-none w-12">{index + 1}</span>
+                                                        <span className="flex-1 whitespace-pre-wrap">{line || ' '}</span>
+                                                    </div>
+                                                ))}
+                                            </code>
+                                        </pre>
+                                    </div>
+                                )}
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
                       </CardContent>
                     </Card>
                   ))}
