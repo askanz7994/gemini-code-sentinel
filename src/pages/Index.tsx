@@ -34,6 +34,7 @@ const Index = () => {
   const [repoInfo, setRepoInfo] = useState<{ owner: string; repo: string } | null>(null);
   const [fileContents, setFileContents] = useState<Record<string, string>>({});
   const [loadingFileContentForVulnId, setLoadingFileContentForVulnId] = useState<number | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
   const { toast } = useToast();
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -158,7 +159,8 @@ const Index = () => {
 
     setIsLoading(true);
     setActiveAction('scan');
-    setResults([]);
+    setIsScanning(true);
+    setResults(null); // Clear previous results and don't show anything until scan is complete
     
     try {
       const { owner, repo } = repoInfo;
@@ -172,7 +174,7 @@ const Index = () => {
       let allVulnerabilities: Vulnerability[] = [];
 
       for (const [index, file] of repoFiles.entries()) {
-        toast({ title: "Scanning...", description: `Analyzing ${file.path} (${index + 1}/${repoFiles.length})` });
+        toast({ title: "Scanning", description: `Analyzing ${file.path} (${index + 1}/${repoFiles.length})` });
         
         await sleep(200); // Add delay to mitigate hitting rate limits
 
@@ -225,13 +227,15 @@ const Index = () => {
                     file: file.path
                 }));
                 allVulnerabilities = [...allVulnerabilities, ...newVulnerabilities];
-                setResults([...allVulnerabilities]);
             }
         } catch (fileError) {
             console.error(`Error processing file ${file.path}:`, fileError);
             toast({ title: "File Processing Error", description: `An error occurred while scanning ${file.path}.`, variant: "destructive" });
         }
       }
+
+      // Set results after scan is complete
+      setResults(allVulnerabilities);
 
       if (allVulnerabilities.length > 0) {
         toast({ title: "Scan Complete", description: `Found ${allVulnerabilities.length} potential vulnerabilities across ${repoFiles.length} files.` });
@@ -245,6 +249,7 @@ const Index = () => {
     } finally {
       setIsLoading(false);
       setActiveAction(null);
+      setIsScanning(false);
     }
   };
 
@@ -402,7 +407,22 @@ const Index = () => {
             </div>
           )}
 
-          {results && (
+          {isScanning && (
+            <div className="mt-12">
+              <h2 className="text-2xl font-bold text-center mb-6">Scanning</h2>
+              <Card className="bg-card/80 backdrop-blur-sm border-border/30">
+                <CardContent className="pt-6">
+                  <div className="flex flex-col items-center justify-center text-center p-6">
+                    <LoaderCircle className="h-12 w-12 text-accent animate-spin mb-4" />
+                    <p className="text-lg font-semibold">Scanning in Progress</p>
+                    <p className="text-muted-foreground mt-1">Analyzing repository files for vulnerabilities...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {results && !isScanning && (
             <div className="mt-12">
               <h2 className="text-2xl font-bold text-center mb-6">Scan Results</h2>
               {results.length > 0 ? (
