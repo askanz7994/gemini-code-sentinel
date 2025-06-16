@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -172,7 +173,7 @@ const Index = () => {
       let allVulnerabilities: Vulnerability[] = [];
 
       for (const [index, file] of repoFiles.entries()) {
-        toast({ title: "Scanning...", description: `Analyzing ${file.path} (${index + 1}/${repoFiles.length})` });
+        toast({ title: "Scanning", description: `Analyzing ${file.path} (${index + 1}/${repoFiles.length})` });
         
         await sleep(200); // Add delay to mitigate hitting rate limits
 
