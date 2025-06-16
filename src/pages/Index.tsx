@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, KeyRound, Files, Lock, Wrench, FileCode } from "lucide-react";
+import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, Files, Lock, Wrench, FileCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { supabase } from "@/integrations/supabase/client";
 
 type Vulnerability = {
   id: number;
@@ -25,7 +26,6 @@ const severityIcons = {
 
 const Index = () => {
   const [repoUrl, setRepoUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeAction, setActiveAction] = useState<'fetch' | 'scan' | null>(null);
@@ -44,10 +44,7 @@ const Index = () => {
       toast({ title: "Error", description: "Please enter a GitHub repository URL.", variant: "destructive" });
       return;
     }
-    if (!apiKey) {
-      toast({ title: "Error", description: "Please enter your Gemini API Key.", variant: "destructive" });
-      return;
-    }
+    
     setIsLoading(true);
     setActiveAction('fetch');
     setResults(null);
@@ -154,10 +151,6 @@ const Index = () => {
       toast({ title: "Error", description: "No files to scan.", variant: "destructive" });
       return;
     }
-    if (!apiKey) {
-      toast({ title: "Error", description: "Missing repository info or API key.", variant: "destructive" });
-      return;
-    }
     if (!repoInfo) {
       toast({ title: "Error", description: "Repository information is missing. Please fetch files first.", variant: "destructive" });
       return;
@@ -208,63 +201,25 @@ const Index = () => {
             }
 
             const fileContent = atob(fileData.content);
-    
-            const prompt = `
-              Analyze the following code from the file '${file.path}' for security vulnerabilities.
-              For each vulnerability, provide a concise description and a suggestion on how to fix it.
-              The severity MUST be one of: 'Critical', 'High', 'Medium', 'Low'.
-              Respond with ONLY a valid JSON array of objects. Each object in the array must have the following schema: { "id": number, "file": string, "line": number, "severity": "Critical" | "High" | "Medium" | "Low", "description": string, "remediation": string }.
-              The 'remediation' attribute should contain a clear, actionable suggestion on how to patch the vulnerability.
-              The 'file' attribute MUST be exactly '${file.path}'.
-              The 'line' number should be the best guess for the line where the vulnerability is found. The 'id' can be a placeholder, it will be reassigned.
-              If there are NO vulnerabilities in this file, you MUST return an empty array [].
-              Do not include any text, notes, or explanations before or after the JSON array.
-    
-              Here is the code from '${file.path}':
-              \`\`\`
-              ${fileContent}
-              \`\`\`
-            `;
 
-            const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-            const geminiResponse = await fetch(geminiApiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-              }),
-            });
-    
-            if (!geminiResponse.ok) {
-              const errorData = await geminiResponse.json().catch(() => null);
-              const errorMessage = errorData?.error?.message || `Analysis failed for ${file.path} with status ${geminiResponse.status}.`;
-              console.error(`Gemini API Error for ${file.path}:`, errorData || geminiResponse.statusText);
-              toast({ title: "Gemini API Error", description: errorMessage, variant: "destructive" });
-              continue;
-            }
-    
-            const geminiData = await geminiResponse.json();
-             if (!geminiData.candidates || geminiData.candidates.length === 0 || !geminiData.candidates[0].content?.parts) {
-              console.warn(`The AI returned an empty or invalid response for ${file.path}.`, geminiData);
-              continue;
-            }
-
-            const responseText = geminiData.candidates[0].content.parts[0].text;
-            const cleanedResponse = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-            let vulnerabilitiesInFile: Vulnerability[] = [];
-            try {
-              if (cleanedResponse) {
-                vulnerabilitiesInFile = JSON.parse(cleanedResponse);
+            // Call the edge function to scan the file
+            const { data, error } = await supabase.functions.invoke('scan-vulnerability', {
+              body: {
+                fileContent: fileContent,
+                filePath: file.path
               }
-            } catch (e) {
-              console.error(`Failed to parse AI response for ${file.path}:`, cleanedResponse);
-              toast({ title: "AI Response Error", description: `Could not parse analysis for ${file.path}.`, variant: "destructive" });
+            });
+
+            if (error) {
+              console.error(`Error scanning file ${file.path}:`, error);
+              toast({ title: "Scan Error", description: `Could not scan ${file.path}: ${error.message}`, variant: "destructive" });
               continue;
             }
+
+            const vulnerabilitiesInFile = data.vulnerabilities || [];
 
             if (vulnerabilitiesInFile.length > 0) {
-                const newVulnerabilities = vulnerabilitiesInFile.map(v => ({
+                const newVulnerabilities = vulnerabilitiesInFile.map((v: any) => ({
                     ...v,
                     id: vulnerabilityIdCounter++,
                     file: file.path
@@ -373,17 +328,6 @@ const Index = () => {
                 disabled={isLoading}
               />
             </div>
-            <div className="relative">
-              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input 
-                type="password"
-                placeholder="Enter your Gemini API Key"
-                className="pl-10 h-12 bg-card border-border/50 focus:ring-accent focus:ring-offset-background"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
             <Button 
               type="submit" 
               className="w-full h-12 text-lg font-bold bg-accent text-primary-foreground border-2 border-transparent transition-all duration-300 hover:bg-transparent hover:text-accent hover:border-accent"
@@ -396,7 +340,6 @@ const Index = () => {
               )}
             </Button>
              <p className="text-xs text-center text-muted-foreground pt-2">
-                Your API keys are used only for this session and are not stored.
                 To scan private repos, {' '}
                 <a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank" rel="noopener noreferrer" className="underline hover:text-accent">
                     create a GitHub token
