@@ -3,7 +3,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Files, LoaderCircle } from "lucide-react";
+import { Files, LoaderCircle, HardDrive } from "lucide-react";
 
 type FilesListProps = {
   repoFiles: any[];
@@ -14,6 +14,15 @@ type FilesListProps = {
 
 const FilesList = ({ repoFiles, onStartScan, isLoading, activeAction }: FilesListProps) => {
   if (!repoFiles) return null;
+
+  const totalSize = repoFiles.reduce((sum, file) => sum + (file.size || 0), 0);
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
 
   return (
     <div className="mt-8 w-full">
@@ -27,20 +36,30 @@ const FilesList = ({ repoFiles, onStartScan, isLoading, activeAction }: FilesLis
         <CardContent>
           {repoFiles.length > 0 ? (
             <>
-              <p className="text-muted-foreground mb-4">
-                Found {repoFiles.length} files to scan. Click the button below to start the vulnerability check.
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-muted-foreground">
+                  Found {repoFiles.length} files to scan. Click the button below to start the vulnerability check.
+                </p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1 rounded-md">
+                  <HardDrive className="h-4 w-4" />
+                  <span className="font-medium">Total: {formatFileSize(totalSize)}</span>
+                </div>
+              </div>
               <div className="max-h-60 overflow-y-auto rounded-md border bg-background/50">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="text-white">File Path</TableHead>
+                      <TableHead className="text-white text-right w-24">Size</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {repoFiles.map((file) => (
                       <TableRow key={file.path}>
                         <TableCell className="font-mono text-sm">{file.path}</TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {file.formattedSize || formatFileSize(file.size || 0)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
