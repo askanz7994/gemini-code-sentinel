@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -442,53 +443,6 @@ const Index = () => {
                         <p className="font-mono text-sm text-accent mb-2">{vuln.file}:{vuln.line}</p>
                         <p className="text-muted-foreground">{vuln.description}</p>
                         <Accordion type="single" collapsible className="w-full mt-4">
-                          {vuln.remediation && (
-                            <AccordionItem value={`remediation-${vuln.id}`}>
-                              <AccordionTrigger className="text-sm hover:no-underline">
-                                <div className="flex items-center gap-2">
-                                  <Wrench className="h-4 w-4 text-muted-foreground" />
-                                  <span>How to Patch</span>
-                                </div>
-                              </AccordionTrigger>
-                              <AccordionContent>
-                                <p className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
-                                  {vuln.remediation}
-                                </p>
-                              </AccordionContent>
-                            </AccordionItem>
-                          )}
-                          {vuln.exploit && (
-                            <AccordionItem value={`exploit-${vuln.id}`}>
-                              <AccordionTrigger className="text-sm hover:no-underline">
-                                <div className="flex items-center gap-2">
-                                  <Zap className="h-4 w-4 text-red-500" />
-                                  <span>How a Hacker Can Crash the App</span>
-                                </div>
-                              </AccordionTrigger>
-                              <AccordionContent>
-                                <div className="bg-red-950/20 border border-red-500/20 rounded-md p-3">
-                                  <p className="whitespace-pre-wrap font-sans text-sm text-red-200">
-                                    {vuln.exploit}
-                                  </p>
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
-                          )}
-                          <AccordionItem value={`pentest-${vuln.id}`}>
-                            <AccordionTrigger className="text-sm hover:no-underline">
-                              <div className="flex items-center gap-2">
-                                <Target className="h-4 w-4 text-purple-500" />
-                                <span>How to Penetration Test</span>
-                              </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                              <div className="bg-purple-950/20 border border-purple-500/20 rounded-md p-3">
-                                <p className="whitespace-pre-wrap font-sans text-sm text-purple-200">
-                                  {vuln.pentest || "Penetration testing guidance not available for this vulnerability."}
-                                </p>
-                              </div>
-                            </AccordionContent>
-                          </AccordionItem>
                           <AccordionItem value={`code-${vuln.id}`}>
                             <AccordionTrigger className="text-sm hover:no-underline" onClick={() => handleViewCode(vuln)}>
                                 <div className="flex items-center gap-2">
@@ -521,6 +475,53 @@ const Index = () => {
                                 )}
                             </AccordionContent>
                           </AccordionItem>
+                          {vuln.exploit && (
+                            <AccordionItem value={`exploit-${vuln.id}`}>
+                              <AccordionTrigger className="text-sm hover:no-underline">
+                                <div className="flex items-center gap-2">
+                                  <Zap className="h-4 w-4 text-red-500" />
+                                  <span>How a Hacker Can Crash the App</span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="bg-red-950/20 border border-red-500/20 rounded-md p-3">
+                                  <p className="whitespace-pre-wrap font-sans text-sm text-red-200">
+                                    {vuln.exploit}
+                                  </p>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
+                          <AccordionItem value={`pentest-${vuln.id}`}>
+                            <AccordionTrigger className="text-sm hover:no-underline">
+                              <div className="flex items-center gap-2">
+                                <Target className="h-4 w-4 text-purple-500" />
+                                <span>How to Penetration Test</span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="bg-purple-950/20 border border-purple-500/20 rounded-md p-3">
+                                <p className="whitespace-pre-wrap font-sans text-sm text-purple-200">
+                                  {vuln.pentest || "Penetration testing guidance not available for this vulnerability."}
+                                </p>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                          {vuln.remediation && (
+                            <AccordionItem value={`remediation-${vuln.id}`}>
+                              <AccordionTrigger className="text-sm hover:no-underline">
+                                <div className="flex items-center gap-2">
+                                  <Wrench className="h-4 w-4 text-muted-foreground" />
+                                  <span>How to Patch</span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <p className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
+                                  {vuln.remediation}
+                                </p>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
                         </Accordion>
                       </CardContent>
                     </Card>
