@@ -1,9 +1,8 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, Files, Lock, Wrench, FileCode, Zap } from "lucide-react";
+import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, Files, Lock, Wrench, FileCode, Zap, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -17,6 +16,7 @@ type Vulnerability = {
   description: string;
   remediation: string;
   exploit: string;
+  pentest?: string;
 };
 
 const severityIcons = {
@@ -474,6 +474,21 @@ const Index = () => {
                               </AccordionContent>
                             </AccordionItem>
                           )}
+                          <AccordionItem value={`pentest-${vuln.id}`}>
+                            <AccordionTrigger className="text-sm hover:no-underline">
+                              <div className="flex items-center gap-2">
+                                <Target className="h-4 w-4 text-purple-500" />
+                                <span>How to Penetration Test</span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="bg-purple-950/20 border border-purple-500/20 rounded-md p-3">
+                                <p className="whitespace-pre-wrap font-sans text-sm text-purple-200">
+                                  {vuln.pentest || "Penetration testing guidance not available for this vulnerability."}
+                                </p>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
                           <AccordionItem value={`code-${vuln.id}`}>
                             <AccordionTrigger className="text-sm hover:no-underline" onClick={() => handleViewCode(vuln)}>
                                 <div className="flex items-center gap-2">
