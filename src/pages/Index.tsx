@@ -48,6 +48,11 @@ const Index = () => {
       return;
     }
     
+    if (!githubToken) {
+      toast({ title: "Error", description: "GitHub Personal Access Token is required.", variant: "destructive" });
+      return;
+    }
+    
     setIsLoading(true);
     setActiveAction('fetch');
     setResults(null);
@@ -71,27 +76,22 @@ const Index = () => {
       }
       setRepoInfo({ owner, repo });
 
-      const headers: HeadersInit = {};
-      if (githubToken) {
-        headers['Authorization'] = `Bearer ${githubToken}`;
-      }
+      const headers: HeadersInit = {
+        'Authorization': `Bearer ${githubToken}`
+      };
 
       toast({ title: "Fetching Files...", description: "Getting repository file list." });
       
       const repoInfoResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
        if (!repoInfoResponse.ok) {
         if (repoInfoResponse.status === 404) {
-           if (githubToken) {
-            throw new Error("Repository not found. Check the URL. For private repos, ensure your token has 'repo' scope and access.");
-          } else {
-            throw new Error("Repository not found. Check the URL. Private repos require a Personal Access Token.");
-          }
+          throw new Error("Repository not found. Check the URL and ensure your token has access to this repository.");
         }
         if (repoInfoResponse.status === 401) {
           throw new Error("Authentication failed. Make sure your GitHub Personal Access Token is correct and has 'repo' scope.");
         }
         if (repoInfoResponse.status === 403) {
-          const errorData = await repoInfoResponse.json().catch(() => ({ message: "Rate limit likely exceeded or repository is private."}));
+          const errorData = await repoInfoResponse.json().catch(() => ({ message: "Rate limit likely exceeded or insufficient permissions."}));
           console.error("GitHub API Error:", errorData);
           throw new Error(`GitHub API access forbidden. ${errorData.message}`);
         }
@@ -109,7 +109,7 @@ const Index = () => {
           throw new Error("Authentication failed. Make sure your GitHub Personal Access Token is correct and has 'repo' scope.");
         }
         if (treeResponse.status === 403) {
-          const errorData = await treeResponse.json().catch(() => ({ message: "Rate limit likely exceeded or repository is private."}));
+          const errorData = await treeResponse.json().catch(() => ({ message: "Rate limit likely exceeded or insufficient permissions."}));
           console.error("GitHub API Error:", errorData);
           throw new Error(`GitHub API access forbidden while fetching file tree. ${errorData.message}`);
         }
@@ -328,11 +328,12 @@ const Index = () => {
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
                 type="password"
-                placeholder="Enter your GitHub Personal Access Token"
+                placeholder="Enter your GitHub Personal Access Token (Required)"
                 className="pl-10 h-12 bg-card border-border/50 focus:ring-accent focus:ring-offset-background"
                 value={githubToken}
                 onChange={(e) => setGithubToken(e.target.value)}
                 disabled={isLoading}
+                required
               />
             </div>
             <Button 
@@ -347,9 +348,9 @@ const Index = () => {
               )}
             </Button>
              <p className="text-xs text-center text-muted-foreground pt-2">
-                To scan private repos, {' '}
+                <strong>GitHub Personal Access Token is required.</strong> {' '}
                 <a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank" rel="noopener noreferrer" className="underline hover:text-accent">
-                    create a GitHub token
+                    Create a GitHub token
                 </a>
                 {' '} with <code className="bg-muted px-1 py-0.5 rounded">repo</code> scope.
              </p>
