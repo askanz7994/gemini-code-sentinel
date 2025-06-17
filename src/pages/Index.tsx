@@ -1,8 +1,9 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, Files, Lock, Wrench, FileCode } from "lucide-react";
+import { Github, LoaderCircle, ShieldAlert, ShieldCheck, ShieldHalf, ShieldX, Files, Lock, Wrench, FileCode, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -15,6 +16,7 @@ type Vulnerability = {
   severity: 'Critical' | 'High' | 'Medium' | 'Low';
   description: string;
   remediation: string;
+  exploit: string;
 };
 
 const severityIcons = {
@@ -451,6 +453,23 @@ const Index = () => {
                                 <p className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
                                   {vuln.remediation}
                                 </p>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
+                          {vuln.exploit && (
+                            <AccordionItem value={`exploit-${vuln.id}`}>
+                              <AccordionTrigger className="text-sm hover:no-underline">
+                                <div className="flex items-center gap-2">
+                                  <Zap className="h-4 w-4 text-red-500" />
+                                  <span>How a Hacker Can Crash the App</span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="bg-red-950/20 border border-red-500/20 rounded-md p-3">
+                                  <p className="whitespace-pre-wrap font-sans text-sm text-red-200">
+                                    {vuln.exploit}
+                                  </p>
+                                </div>
                               </AccordionContent>
                             </AccordionItem>
                           )}
