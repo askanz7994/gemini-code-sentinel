@@ -8,8 +8,9 @@ import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useCredits } from "@/hooks/useCredits";
+import { usePayPal } from "@/hooks/usePayPal";
 import { CreditCard, Plus } from "lucide-react";
 
 interface Profile {
@@ -24,7 +25,9 @@ const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { credits, addCredits } = useCredits();
+  const [searchParams] = useSearchParams();
+  const { credits, fetchCredits } = useCredits();
+  const { loading: paypalLoading, createPayPalOrder, capturePayPalPayment } = usePayPal();
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [firstName, setFirstName] = useState("");
@@ -37,7 +40,30 @@ const Profile = () => {
     }
 
     fetchProfile();
-  }, [user, navigate]);
+    
+    // Handle PayPal return
+    const payment = searchParams.get('payment');
+    const orderId = searchParams.get('token'); // PayPal returns token as orderId
+    
+    if (payment === 'success' && orderId) {
+      handlePayPalReturn(orderId);
+    } else if (payment === 'cancelled') {
+      toast({
+        title: "Payment Cancelled",
+        description: "Your payment was cancelled. No charges were made.",
+        variant: "destructive",
+      });
+    }
+  }, [user, navigate, searchParams]);
+
+  const handlePayPalReturn = async (orderId: string) => {
+    const success = await capturePayPalPayment(orderId, 25); // Assuming 25 credits package
+    if (success) {
+      fetchCredits(); // Refresh credit balance
+      // Clear URL parameters
+      navigate('/profile', { replace: true });
+    }
+  };
 
   const fetchProfile = async () => {
     if (!user) return;
@@ -106,14 +132,11 @@ const Profile = () => {
   };
 
   const handlePurchaseCredits = async () => {
-    // For now, we'll simulate adding 25 credits for $20
-    // In a real implementation, this would integrate with PayPal
-    const success = await addCredits(25, "Credit purchase - $20 for 25 credits");
-    if (success) {
-      toast({
-        title: "Credits Purchased",
-        description: "25 credits have been added to your account!",
-      });
+    const orderData = await createPayPalOrder(25, "20.00");
+    
+    if (orderData?.approvalUrl) {
+      // Redirect to PayPal for payment approval
+      window.location.href = orderData.approvalUrl;
     }
   };
 
@@ -141,12 +164,13 @@ const Profile = () => {
               onClick={handlePurchaseCredits}
               className="w-full"
               variant="outline"
+              disabled={paypalLoading}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Buy 25 Credits for $20
+              {paypalLoading ? "Creating order..." : "Buy 25 Credits for $20"}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              Each vulnerability scan uses 1 credit
+              Each vulnerability scan uses 1 credit. Secure payment via PayPal.
             </p>
           </div>
 
