@@ -7,9 +7,9 @@ import { Files, LoaderCircle, HardDrive } from "lucide-react";
 
 type FilesListProps = {
   repoFiles: any[];
-  onStartScan: () => void;
+  onStartScan: (files: string[]) => void;
   isLoading: boolean;
-  activeAction: 'fetch' | 'scan' | null;
+  activeAction: 'fetch' | 'scan' | 'scanning' | null;
 };
 
 const FilesList = ({ repoFiles, onStartScan, isLoading, activeAction }: FilesListProps) => {
@@ -22,6 +22,11 @@ const FilesList = ({ repoFiles, onStartScan, isLoading, activeAction }: FilesLis
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const handleStartScan = () => {
+    const filePaths = repoFiles.map(file => file.path);
+    onStartScan(filePaths);
   };
 
   return (
@@ -66,11 +71,11 @@ const FilesList = ({ repoFiles, onStartScan, isLoading, activeAction }: FilesLis
                 </Table>
               </div>
               <Button 
-                onClick={onStartScan}
+                onClick={handleStartScan}
                 className="w-full mt-6 h-12 text-lg font-bold"
                 disabled={isLoading}
               >
-                {isLoading && activeAction === 'scan' ? (
+                {isLoading && (activeAction === 'scan' || activeAction === 'scanning') ? (
                   <LoaderCircle className="animate-spin h-6 w-6" />
                 ) : (
                   "Start Vulnerability Scan"
