@@ -2,9 +2,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, LoaderCircle, Key } from "lucide-react";
+import { Github, LoaderCircle, Lock } from "lucide-react";
 
 type RepositoryFormProps = {
   repoUrl: string;
@@ -13,7 +11,7 @@ type RepositoryFormProps = {
   setGithubToken: (token: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   isLoading: boolean;
-  activeAction: 'fetch' | 'scan' | 'scanning' | null;
+  activeAction: 'fetch' | 'scan' | null;
 };
 
 const RepositoryForm = ({
@@ -26,63 +24,49 @@ const RepositoryForm = ({
   activeAction
 }: RepositoryFormProps) => {
   return (
-    <Card className="bg-card/80 backdrop-blur-sm border-border/30">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <Github className="h-6 w-6 text-accent" />
-          <span>Repository Scanner</span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="repo-url" className="text-foreground font-medium">
-              GitHub Repository URL
-            </Label>
-            <Input
-              id="repo-url"
-              type="url"
-              placeholder="https://github.com/owner/repository"
-              value={repoUrl}
-              onChange={(e) => setRepoUrl(e.target.value)}
-              className="bg-background/50 border-border/50 focus:border-accent"
-              required
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="github-token" className="text-foreground font-medium flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              GitHub Personal Access Token
-            </Label>
-            <Input
-              id="github-token"
-              type="password"
-              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-              value={githubToken}
-              onChange={(e) => setGithubToken(e.target.value)}
-              className="bg-background/50 border-border/50 focus:border-accent"
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Required to access repository files. Create one at GitHub Settings → Developer settings → Personal access tokens.
-            </p>
-          </div>
-          
-          <Button 
-            type="submit" 
-            className="w-full h-12 text-lg font-bold"
-            disabled={isLoading}
-          >
-            {isLoading && activeAction === 'fetch' ? (
-              <LoaderCircle className="animate-spin h-6 w-6" />
-            ) : (
-              "Fetch Repository Files"
-            )}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="relative">
+        <Github className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        <Input 
+          type="text"
+          placeholder="https://github.com/owner/repo"
+          className="pl-10 h-12 bg-card border-border/50 focus:ring-accent focus:ring-offset-background"
+          value={repoUrl}
+          onChange={(e) => setRepoUrl(e.target.value)}
+          disabled={isLoading}
+        />
+      </div>
+      <div className="relative">
+        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+        <Input
+          type="password"
+          placeholder="Enter your GitHub Personal Access Token (Required)"
+          className="pl-10 h-12 bg-card border-border/50 focus:ring-accent focus:ring-offset-background"
+          value={githubToken}
+          onChange={(e) => setGithubToken(e.target.value)}
+          disabled={isLoading}
+          required
+        />
+      </div>
+      <Button 
+        type="submit" 
+        className="w-full h-12 text-lg font-bold bg-accent text-primary-foreground border-2 border-transparent transition-all duration-300 hover:bg-transparent hover:text-accent hover:border-accent"
+        disabled={isLoading}
+      >
+        {isLoading && activeAction === 'fetch' ? (
+          <LoaderCircle className="animate-spin h-6 w-6" />
+        ) : (
+          "Analyze Repository"
+        )}
+      </Button>
+      <p className="text-xs text-center text-muted-foreground pt-2">
+        <strong>GitHub Personal Access Token is required.</strong> {' '}
+        <a href="https://github.com/settings/tokens/new?scopes=repo" target="_blank" rel="noopener noreferrer" className="underline hover:text-accent">
+          Create a GitHub token
+        </a>
+        {' '} with <code className="bg-muted px-1 py-0.5 rounded">repo</code> scope.
+      </p>
+    </form>
   );
 };
 

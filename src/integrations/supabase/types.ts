@@ -9,42 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      payments: {
-        Row: {
-          amount: number | null
-          created_at: string
-          currency: string | null
-          id: string
-          paypal_order_id: string | null
-          scans_purchased: number | null
-          status: string | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          amount?: number | null
-          created_at?: string
-          currency?: string | null
-          id?: string
-          paypal_order_id?: string | null
-          scans_purchased?: number | null
-          status?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          amount?: number | null
-          created_at?: string
-          currency?: string | null
-          id?: string
-          paypal_order_id?: string | null
-          scans_purchased?: number | null
-          status?: string | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           created_at: string
@@ -52,9 +16,12 @@ export type Database = {
           first_name: string | null
           id: string
           last_name: string | null
-          remaining_scans: number | null
-          total_scans_purchased: number | null
+          preferred_language: string | null
+          referrer_whatsapp: string | null
+          remaining_credits: number
           updated_at: string
+          used_credits: number
+          whatsapp_number: string | null
         }
         Insert: {
           created_at?: string
@@ -62,9 +29,12 @@ export type Database = {
           first_name?: string | null
           id: string
           last_name?: string | null
-          remaining_scans?: number | null
-          total_scans_purchased?: number | null
+          preferred_language?: string | null
+          referrer_whatsapp?: string | null
+          remaining_credits?: number
           updated_at?: string
+          used_credits?: number
+          whatsapp_number?: string | null
         }
         Update: {
           created_at?: string
@@ -72,9 +42,12 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
-          remaining_scans?: number | null
-          total_scans_purchased?: number | null
+          preferred_language?: string | null
+          referrer_whatsapp?: string | null
+          remaining_credits?: number
           updated_at?: string
+          used_credits?: number
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
@@ -83,12 +56,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      add_scan_credits: {
-        Args: { user_uuid: string; credits: number }
+      add_user_credits: {
+        Args: { amount?: number }
         Returns: boolean
       }
-      use_scan_credit: {
-        Args: { user_uuid: string }
+      get_user_credit_details: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_credits: number
+          valid_credits: number
+          next_expiry: string
+        }[]
+      }
+      get_user_credits: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      use_user_credit: {
+        Args: Record<PropertyKey, never>
         Returns: boolean
       }
     }
