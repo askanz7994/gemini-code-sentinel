@@ -9,9 +9,37 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      credit_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
+          credits: number | null
           email: string | null
           first_name: string | null
           id: string
@@ -20,6 +48,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          credits?: number | null
           email?: string | null
           first_name?: string | null
           id: string
@@ -28,11 +57,42 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          credits?: number | null
           email?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      scans: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          credits_used: number | null
+          id: string
+          repository_url: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          credits_used?: number | null
+          id?: string
+          repository_url: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          credits_used?: number | null
+          id?: string
+          repository_url?: string
+          status?: string
+          user_id?: string
         }
         Relationships: []
       }

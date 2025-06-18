@@ -2,13 +2,15 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { User, LogOut } from "lucide-react";
+import { User, LogOut, CreditCard } from "lucide-react";
+import { useCredits } from "@/hooks/useCredits";
 
 const AuthButton = () => {
   const { user, signOut } = useAuth();
+  const { credits, loading } = useCredits();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -46,6 +48,17 @@ const AuthButton = () => {
           </div>
           <div className="text-xs text-muted-foreground">{user.email}</div>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem className="flex items-center justify-between">
+          <div className="flex items-center">
+            <CreditCard className="mr-2 h-4 w-4" />
+            Credits
+          </div>
+          <div className="font-semibold text-primary">
+            {loading ? "..." : credits}
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate("/profile")}>
           <User className="mr-2 h-4 w-4" />
           Profile
