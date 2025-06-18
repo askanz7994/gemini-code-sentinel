@@ -63,9 +63,11 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get PayPal access token
-    const paypalApiKey = Deno.env.get('PAYPAL_API_KEY')
-    if (!paypalApiKey) {
+    // Get PayPal credentials
+    const paypalClientId = Deno.env.get('PAYPAL_CLIENT_ID')
+    const paypalClientSecret = Deno.env.get('PAYPAL_CLIENT_SECRET')
+    
+    if (!paypalClientId || !paypalClientSecret) {
       return new Response(
         JSON.stringify({ error: 'PayPal configuration error' }),
         { 
@@ -75,10 +77,11 @@ Deno.serve(async (req) => {
       )
     }
 
-    const tokenResponse = await fetch('https://api-m.sandbox.paypal.com/v1/oauth2/token', {
+    // Get PayPal access token using live API
+    const tokenResponse = await fetch('https://api-m.paypal.com/v1/oauth2/token', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${btoa(`${paypalApiKey}:`)}`,
+        'Authorization': `Basic ${btoa(`${paypalClientId}:${paypalClientSecret}`)}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: 'grant_type=client_credentials'
@@ -96,8 +99,8 @@ Deno.serve(async (req) => {
 
     const tokenData: PayPalTokenResponse = await tokenResponse.json()
 
-    // Capture the payment
-    const captureResponse = await fetch(`https://api-m.sandbox.paypal.com/v2/checkout/orders/${orderId}/capture`, {
+    // Capture the payment using live API
+    const captureResponse = await fetch(`https://api-m.paypal.com/v2/checkout/orders/${orderId}/capture`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${tokenData.access_token}`,
