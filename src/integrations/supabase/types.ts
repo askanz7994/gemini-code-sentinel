@@ -9,90 +9,45 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      credit_transactions: {
-        Row: {
-          amount: number
-          created_at: string
-          description: string | null
-          id: string
-          type: string
-          user_id: string
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          description?: string | null
-          id?: string
-          type: string
-          user_id: string
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          description?: string | null
-          id?: string
-          type?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
-          created_at: string | null
-          credits: number | null
+          created_at: string
           email: string | null
           first_name: string | null
           id: string
           last_name: string | null
-          updated_at: string | null
+          preferred_language: string | null
+          referrer_whatsapp: string | null
+          remaining_credits: number
+          updated_at: string
+          used_credits: number
+          whatsapp_number: string | null
         }
         Insert: {
-          created_at?: string | null
-          credits?: number | null
+          created_at?: string
           email?: string | null
           first_name?: string | null
           id: string
           last_name?: string | null
-          updated_at?: string | null
+          preferred_language?: string | null
+          referrer_whatsapp?: string | null
+          remaining_credits?: number
+          updated_at?: string
+          used_credits?: number
+          whatsapp_number?: string | null
         }
         Update: {
-          created_at?: string | null
-          credits?: number | null
+          created_at?: string
           email?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      scans: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          credits_used: number | null
-          id: string
-          repository_url: string
-          status: string
-          user_id: string
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          credits_used?: number | null
-          id?: string
-          repository_url: string
-          status?: string
-          user_id: string
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          credits_used?: number | null
-          id?: string
-          repository_url?: string
-          status?: string
-          user_id?: string
+          preferred_language?: string | null
+          referrer_whatsapp?: string | null
+          remaining_credits?: number
+          updated_at?: string
+          used_credits?: number
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
@@ -101,7 +56,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      add_user_credits: {
+        Args: { amount?: number }
+        Returns: boolean
+      }
+      get_user_credit_details: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_credits: number
+          valid_credits: number
+          next_expiry: string
+        }[]
+      }
+      get_user_credits: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      use_user_credit: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
